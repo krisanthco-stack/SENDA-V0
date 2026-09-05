@@ -1,0 +1,386 @@
+name: Build SENDA.V0 Windows Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Resolve release metadata
+        id: meta
+        shell: pwsh
+        run: |
+          $version = python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])"
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "No se pudo obtener una versión válida desde pyproject.toml: '$version'"
+          }
+          $tag = "v$version"
+          $asset = "SENDA.V0_${version}_WINDOWS_DESKTOP.zip"
+          $artifact = "SENDA.V0-${version}-Windows-Desktop"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "tag=$tag" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "asset=$asset" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "artifact=$artifact" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "SENDA_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SENDA_TAG=$tag" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "SENDA_ASSET=$asset" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Write-Host "Versión resuelta: $version"
+          Write-Host "Paquete: $asset"
+
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne $tag) {
+            throw "El tag ejecutado '$($env:GITHUB_REF_NAME)' no coincide con la versión de pyproject.toml '$tag'."
+          }
+
+      - name: Restore hidden Pages marker for regression suite
+        shell: pwsh
+        run: |
+          if (-not (Test-Path '.nojekyll')) {
+            New-Item -ItemType File -Path '.nojekyll' -Force | Out-Null
+          }
+
+      - name: Clean and verify shadowed Python dependencies
+        shell: pwsh
+        run: |
+          # GitHub web uploads merge files into the repository and do not remove
+          # old committed dependency folders. Remove known stale/vendor copies
+          # before Python resolves imports so the build always uses pip packages.
+          $forbidden = @(
+            'openpyxl',
+            'xlsxwriter',
+            'et_xmlfile',
+            'vendor/openpyxl',
+            'vendor/xlsxwriter',
+            'vendor/et_xmlfile',
+            'webview',
+            'pythonnet',
+            'clr_loader',
+            'clr.py'
+          )
+
+          foreach ($item in $forbidden) {
+            if (Test-Path $item) {
+              Write-Warning "Eliminando dependencia local heredada que sombrearía pip: $item"
+              Remove-Item -LiteralPath $item -Recurse -Force
+            }
+          }
+
+          $remaining = @($forbidden | Where-Object { Test-Path $_ })
+          if ($remaining.Count -gt 0) {
+            throw "No se pudieron eliminar dependencias Python locales conflictivas: $($remaining -join ', ')"
+          }
+
+          Write-Host 'No quedan dependencias Python locales que puedan sombrear site-packages.'
+
+      - name: Install pinned build dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install `
+            pyinstaller==6.22.2 `
+            pywebview==6.2.1 `
+            pythonnet==3.1.0 `
+            clr-loader==0.3.1 `
+            openpyxl==3.1.5 `
+            xlsxwriter==3.2.9 `
+            xlrd==2.0.2 `
+            pytest==9.0.2
+          python -m pip check
+
+      - name: Verify Windows WebView runtime imports
+        shell: pwsh
+        run: |
+          @'
+          from importlib.metadata import version
+          from pathlib import Path
+          import clr
+          import webview
+          import pythonnet
+          import clr_loader
+          print('pywebview=' + version('pywebview'))
+          print('pythonnet=' + version('pythonnet'))
+          print('clr-loader=' + version('clr-loader'))
+          assert version('pywebview') == '6.2.1'
+          assert version('pythonnet') == '3.1.0'
+          assert version('clr-loader') == '0.3.1'
+          repo = Path.cwd().resolve()
+          for name, module in {'webview': webview, 'pythonnet': pythonnet, 'clr_loader': clr_loader}.items():
+              module_path = Path(module.__file__).resolve()
+              print(f'{name}={module_path}')
+              try:
+                  module_path.relative_to(repo)
+              except ValueError:
+                  continue
+              raise SystemExit(f'ERROR: {name} se está importando desde el repositorio: {module_path}')
+          print('pythonnet/clr y PyWebView cargan correctamente desde site-packages antes de PyInstaller.')
+          '@ | python -
+
+      - name: Verify Excel dependency imports
+        shell: pwsh
+        run: |
+          @'
+          from pathlib import Path
+          import openpyxl
+          import openpyxl.compat
+          import xlsxwriter
+          import xlrd
+
+          repo = Path.cwd().resolve()
+          modules = {
+              'openpyxl': Path(openpyxl.__file__).resolve(),
+              'openpyxl.compat': Path(openpyxl.compat.__file__).resolve(),
+              'xlsxwriter': Path(xlsxwriter.__file__).resolve(),
+              'xlrd': Path(xlrd.__file__).resolve(),
+          }
+
+          for name, path in modules.items():
+              print(f'{name}={path}')
+              try:
+                  path.relative_to(repo)
+              except ValueError:
+                  continue
+              raise SystemExit(f'ERROR: {name} se está importando desde el repositorio: {path}')
+
+          print('Dependencias Excel verificadas desde site-packages.')
+          '@ | python -
+
+      - name: Run tests
+        shell: pwsh
+        run: |
+          python -m pytest -q
+
+      - name: Verify desktop uses official UI
+        shell: pwsh
+        run: |
+          python SENDA_V0_DESKTOP.pyw --check --data-dir "$env:RUNNER_TEMP\senda-source-check"
+          $entry = Get-Content SENDA_V0_DESKTOP.pyw -Raw
+          if ($entry -notmatch 'app.desktop_webview') { throw 'El entrypoint no usa la UI web oficial.' }
+          $desktop = Get-Content app/desktop_webview.py -Raw
+          if ($desktop -notmatch "gui='edgechromium'") { throw 'Windows no fuerza Edge Chromium/WebView2.' }
+          if ($desktop -notmatch 'text_select=True') { throw 'La ventana Windows no habilita seleccion de texto con mouse.' }
+          if (-not (Test-Path 'ui/index.html') -or -not (Test-Path 'ui/app.js') -or -not (Test-Path 'ui/app.css')) { throw 'Faltan archivos de la UI oficial.' }
+          $pagesEntry = Get-Content index.html -Raw
+          if ($pagesEntry -notmatch '\./ui/') { throw 'GitHub Pages no redirige a la misma ui/ usada por Windows.' }
+          Write-Host 'GitHub Pages y Windows comparten ui/ como única fuente visual.'
+
+      - name: Bundle 7-Zip for RAR
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force tools/7zip | Out-Null
+          $seven = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          $dll = Join-Path $env:ProgramFiles '7-Zip\7z.dll'
+          if (-not (Test-Path $seven) -or -not (Test-Path $dll)) {
+            throw '7-Zip no disponible en el runner Windows'
+          }
+          Copy-Item $seven tools/7zip/7z.exe -Force
+          Copy-Item $dll tools/7zip/7z.dll -Force
+
+      - name: Build standalone EXE
+        shell: pwsh
+        run: |
+          pyinstaller --noconfirm --clean --windowed --name SENDA.V0 --icon assets/senda_v0.ico `
+            --add-data "assets;assets" --add-data "ui;ui" --add-data "tools;tools" `
+            --collect-all webview --collect-all openpyxl --collect-all xlsxwriter --collect-all xlrd `
+            SENDA_V0_DESKTOP.pyw
+
+      - name: Verify packaged UI matches GitHub UI byte-for-byte
+        shell: pwsh
+        run: |
+          $packedUi = Join-Path $PWD 'dist\SENDA.V0\_internal\ui'
+          if (-not (Test-Path $packedUi)) { throw "PyInstaller no incluyó _internal\ui." }
+          $uiFiles = @(
+            'index.html',
+            'app.css',
+            'app.js',
+            'assets/senda_v0.ico',
+            'assets/senda_v0.png'
+          )
+          foreach ($relative in $uiFiles) {
+            $source = Join-Path $PWD (Join-Path 'ui' $relative)
+            $packed = Join-Path $packedUi $relative
+            if (-not (Test-Path $packed)) { throw "Falta UI empaquetada: $relative" }
+            $srcHash = (Get-FileHash -Algorithm SHA256 $source).Hash
+            $pkgHash = (Get-FileHash -Algorithm SHA256 $packed).Hash
+            if ($srcHash -ne $pkgHash) { throw "La UI del instalable difiere de GitHub: $relative" }
+          }
+          Write-Host 'UI GitHub = UI empaquetada: verificación SHA-256 correcta.'
+
+      - name: Smoke-test built EXE including Edge Chromium GUI
+        shell: pwsh
+        run: |
+          $exe = Join-Path $PWD 'dist\SENDA.V0\SENDA.V0.exe'
+          if (-not (Test-Path $exe)) { throw 'No se generó SENDA.V0.exe' }
+          Get-ChildItem -LiteralPath (Split-Path $exe -Parent) -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
+          $p = Start-Process -FilePath $exe -ArgumentList '--check' -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            throw "SENDA.V0.exe --check falló con código $($p.ExitCode)"
+          }
+          $gui = Start-Process -FilePath $exe -ArgumentList '--smoke-gui' -PassThru
+          if (-not $gui.WaitForExit(30000)) {
+            Stop-Process -Id $gui.Id -Force -ErrorAction SilentlyContinue
+            throw 'La prueba GUI Edge Chromium no terminó en 30 segundos.'
+          }
+          if ($gui.ExitCode -ne 0) {
+            throw "La prueba GUI real falló con código $($gui.ExitCode)"
+          }
+          Write-Host 'GUI Edge Chromium inicializada correctamente desde el EXE empaquetado.'
+
+      - name: Assemble installer folder
+        shell: pwsh
+        run: |
+          $asset = '${{ steps.meta.outputs.asset }}'
+          Remove-Item release -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force release/SENDA.V0 | Out-Null
+          Copy-Item -Path 'dist/SENDA.V0/*' -Destination 'release/SENDA.V0' -Recurse -Force
+          New-Item -ItemType Directory -Force release/SENDA.V0/scripts | Out-Null
+          Copy-Item scripts/install_desktop.ps1 release/SENDA.V0/scripts/
+          Copy-Item scripts/update_desktop.ps1 release/SENDA.V0/scripts/
+          Copy-Item scripts/uninstall_desktop.ps1 release/SENDA.V0/scripts/
+          Copy-Item scripts/install_from_github.ps1 release/SENDA.V0/scripts/
+          Copy-Item scripts/extract_installer_from_github.ps1 release/SENDA.V0/scripts/
+          Copy-Item INSTALAR_SENDA_V0.bat release/SENDA.V0/
+          Copy-Item INSTALAR_DESDE_GITHUB.bat release/SENDA.V0/
+          Copy-Item EXTRAER_INSTALADOR_GITHUB.bat release/SENDA.V0/
+          Copy-Item ACTUALIZAR_SENDA_V0.bat release/SENDA.V0/
+          Copy-Item DESINSTALAR_SENDA_V0.bat release/SENDA.V0/
+          Copy-Item MANTENIMIENTO_SENDA_V0.bat release/SENDA.V0/
+          Compress-Archive -Path release/SENDA.V0/* -DestinationPath $asset -Force
+
+      - name: Verify release package
+        shell: pwsh
+        run: |
+          $asset = '${{ steps.meta.outputs.asset }}'
+          if (-not (Test-Path $asset)) { throw "No existe el paquete $asset" }
+          if ((Get-Item $asset).Length -lt 100000) { throw "El paquete $asset es demasiado pequeño" }
+
+          $verifyRoot = Join-Path $env:RUNNER_TEMP 'senda-release-verify'
+          Remove-Item $verifyRoot -Recurse -Force -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $verifyRoot | Out-Null
+          Expand-Archive -Path $asset -DestinationPath $verifyRoot -Force
+
+          $required = @(
+            'SENDA.V0.exe',
+            'scripts/install_desktop.ps1',
+            'scripts/update_desktop.ps1',
+            'scripts/uninstall_desktop.ps1',
+            'scripts/install_from_github.ps1',
+            'scripts/extract_installer_from_github.ps1',
+            'INSTALAR_SENDA_V0.bat',
+            'INSTALAR_DESDE_GITHUB.bat',
+            'EXTRAER_INSTALADOR_GITHUB.bat',
+            'ACTUALIZAR_SENDA_V0.bat',
+            'DESINSTALAR_SENDA_V0.bat'
+          )
+          foreach ($relative in $required) {
+            $candidate = Join-Path $verifyRoot $relative
+            if (-not (Test-Path $candidate)) {
+              throw "El paquete no contiene el archivo obligatorio: $relative"
+            }
+          }
+
+          $uiFiles = @('index.html','app.css','app.js','assets/senda_v0.ico','assets/senda_v0.png')
+          $unzippedUi = Join-Path $verifyRoot '_internal\ui'
+          foreach ($relative in $uiFiles) {
+            $source = Join-Path $PWD (Join-Path 'ui' $relative)
+            $packed = Join-Path $unzippedUi $relative
+            if (-not (Test-Path $packed)) { throw "El ZIP final perdió el archivo UI: $relative" }
+            if ((Get-FileHash -Algorithm SHA256 $source).Hash -ne (Get-FileHash -Algorithm SHA256 $packed).Hash) {
+              throw "El ZIP final contiene una UI distinta a GitHub: $relative"
+            }
+          }
+
+          Get-ChildItem -LiteralPath $verifyRoot -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
+          $exe = Join-Path $verifyRoot 'SENDA.V0.exe'
+          $p = Start-Process -FilePath $exe -ArgumentList '--check' -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            throw "El EXE extraído del ZIP falló --check con código $($p.ExitCode)"
+          }
+          $gui = Start-Process -FilePath $exe -ArgumentList '--smoke-gui' -PassThru
+          if (-not $gui.WaitForExit(30000)) {
+            Stop-Process -Id $gui.Id -Force -ErrorAction SilentlyContinue
+            throw 'El EXE extraído del ZIP no completó la prueba GUI en 30 segundos.'
+          }
+          if ($gui.ExitCode -ne 0) { throw "El EXE extraído del ZIP falló la prueba GUI: $($gui.ExitCode)" }
+
+          $sha = (Get-FileHash -Algorithm SHA256 -Path $asset).Hash.ToLowerInvariant()
+          Write-Host "SHA-256 $asset = $sha"
+          "SHA256=$sha" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Validate release tag safety
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.meta.outputs.tag }}'
+          $tagLines = @(git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}")
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudieron consultar los tags remotos.' }
+
+          $existingTagSha = $null
+          $peeled = $tagLines | Where-Object { $_ -match '\^\{\}$' } | Select-Object -First 1
+          $direct = $tagLines | Where-Object { $_ -notmatch '\^\{\}$' } | Select-Object -First 1
+          $selected = if ($peeled) { $peeled } else { $direct }
+          if ($selected) { $existingTagSha = ($selected -split '\s+')[0] }
+
+          if ($existingTagSha -and $existingTagSha -ne $env:GITHUB_SHA) {
+            throw "El tag $tag ya existe y apunta a otro commit ($existingTagSha), no al commit actual $($env:GITHUB_SHA)."
+          }
+          if ($existingTagSha) {
+            Write-Host "Tag existente validado: $tag -> $existingTagSha"
+          } else {
+            Write-Host "El tag $tag aún no existe; la Release podrá crearlo sobre $($env:GITHUB_SHA)."
+          }
+
+      - name: Upload Windows Desktop artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.meta.outputs.artifact }}
+          path: release/SENDA.V0
+          if-no-files-found: error
+
+      - name: Publish installable GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          $version = '${{ steps.meta.outputs.version }}'
+          $tag = '${{ steps.meta.outputs.tag }}'
+          $asset = '${{ steps.meta.outputs.asset }}'
+          $title = "SENDA.V0 $version"
+          $notes = "SENDA.V0 Desktop para Windows. Incluye instalación local, botón Actualizar desde GitHub, XLS/XLSX/CSV/JSON/TXT/ZIP/RAR, estadísticas de Inicio y Gestión, alarmas visibles, deduplicación lógica, extracción del instalador, trámites pendientes y Base SENDA Excel/JSON fusionable entre computadoras. SHA-256: $env:SHA256"
+
+          $releaseTags = @(gh release list --limit 100 --json tagName --jq '.[].tagName')
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudo consultar la lista de Releases.' }
+          $releaseExists = $releaseTags -contains $tag
+
+          $tagLines = @(git ls-remote --tags origin "refs/tags/$tag" "refs/tags/$tag^{}")
+          if ($LASTEXITCODE -ne 0) { throw 'No se pudieron consultar los tags antes de publicar.' }
+          $tagExists = $tagLines.Count -gt 0
+
+          if ($releaseExists) {
+            gh release upload $tag $asset --clobber
+            if ($LASTEXITCODE -ne 0) { throw "No se pudo actualizar el asset de la Release $tag." }
+            gh release edit $tag --title $title --notes $notes --latest
+            if ($LASTEXITCODE -ne 0) { throw "No se pudo actualizar la Release $tag." }
+          } elseif ($tagExists) {
+            gh release create $tag $asset --verify-tag --title $title --notes $notes --latest
+            if ($LASTEXITCODE -ne 0) { throw "No se pudo crear la Release usando el tag existente $tag." }
+          } else {
+            gh release create $tag $asset --target $env:GITHUB_SHA --title $title --notes $notes --latest
+            if ($LASTEXITCODE -ne 0) { throw "No se pudo crear la Release $tag." }
+          }
