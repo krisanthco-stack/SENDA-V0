@@ -1,0 +1,30 @@
+SENDA.V0 0.4.6 - AUDITORIA ARRANQUE WINDOWS
+
+Incidencia reproducida por el usuario:
+Failed to resolve Python.Runtime.Loader.Initialize from ...\_internal\pythonnet\runtime\Python.Runtime.dll
+
+Diagnostico:
+La 0.4.5 usaba PyWebView 5.4 + pythonnet transitivo y el workflow solo ejecutaba --check, que NO importaba ni inicializaba PyWebView/pythonnet. Por eso GitHub Actions podia quedar verde aunque el EXE real fallara al abrir la ventana. Ademas, un ZIP descargado puede conservar Mark-of-the-Web en DLL extraidas.
+
+Correccion 0.4.6:
+- Stack Windows fijado: pywebview 6.2.1, pythonnet 3.1.0, clr-loader 0.3.1.
+- gui=edgechromium.
+- text_select=True.
+- limpieza Zone.Identifier antes de importar webview.
+- Unblock-File en instalacion/actualizacion.
+- limpieza de dependencias heredadas webview/pythonnet/clr_loader/clr.py en CI.
+- verificacion import clr antes de empaquetar.
+- prueba --smoke-gui del EXE empaquetado.
+- segunda prueba --smoke-gui del EXE extraido del ZIP final.
+- UI continua validada byte a byte contra ui/ de GitHub.
+
+Verificacion local del repositorio:
+- pytest: 127 passed.
+- SENDA_V0_DESKTOP.pyw --check: OK 0.4.6.
+- ui/app.js: sintaxis OK.
+- workflow YAML: parseo OK.
+- Importacion real junio: 8691 nuevos, 1657 duplicados, 0 omitidos, 0 errores.
+- Folios reportados: 281400, 281407, 281408, 281413, 281414 reconocidos 5/5.
+
+Limitacion honesta:
+La compilacion y ejecucion efectiva del binario Windows se realiza en GitHub Actions windows-latest. La nueva prueba --smoke-gui hace que el workflow falle si pythonnet/WebView2 no logra inicializar la GUI; esto cubre el fallo que --check no detectaba.

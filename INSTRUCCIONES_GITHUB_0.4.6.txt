@@ -1,0 +1,20 @@
+SENDA.V0 0.4.6 - SUBIR A GITHUB Y GENERAR WINDOWS
+
+RECOMENDADO: reemplazar el contenido del repositorio por el contenido de SENDA.V0_0.4.6_REPOSITORIO_GITHUB_FINAL.zip.
+
+1. Extraiga el ZIP.
+2. Suba su CONTENIDO a la raiz del repositorio SENDA-V0.
+3. Confirme los cambios.
+4. Abra Actions.
+5. Abra Build SENDA.V0 Windows Desktop.
+6. Pulse Run workflow.
+7. El build debe pasar el paso: Verify Windows WebView runtime imports.
+8. Debe pasar: Smoke-test built EXE including Edge Chromium GUI.
+9. Debe pasar Verify release package, que repite la prueba GUI desde el ZIP final.
+10. Descargue el Artifact SENDA.V0-0.4.6-Windows-Desktop o la Release SENDA.V0_0.4.6_WINDOWS_DESKTOP.zip.
+11. Extraiga la Release y ejecute INSTALAR_SENDA_V0.bat.
+
+IMPORTANTE:
+- No ejecute un SENDA.V0.exe viejo de 0.4.5.
+- El instalador 0.4.6 desbloquea las DLL descargadas antes del primer arranque.
+- Windows usa Edge Chromium/WebView2 y la misma carpeta ui/ que GitHub Pages.

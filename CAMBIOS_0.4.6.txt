@@ -1,0 +1,19 @@
+SENDA.V0 0.4.6 - CORRECCION ARRANQUE WINDOWS
+
+Problema corregido:
+- RuntimeError: Failed to resolve Python.Runtime.Loader.Initialize desde _internal\pythonnet\runtime\Python.Runtime.dll.
+
+Correcciones:
+- PyWebView 6.2.1.
+- pythonnet 3.1.0.
+- clr-loader 0.3.1.
+- Edge Chromium/WebView2 forzado en Windows.
+- Eliminacion preventiva de Zone.Identifier (Mark-of-the-Web) de DLL/PYD/EXE antes de importar pywebview/pythonnet.
+- Instalador y actualizador ejecutan Unblock-File antes de la primera comprobacion/ejecucion.
+- El workflow elimina copias locales heredadas de webview/pythonnet/clr_loader/clr.py ademas de openpyxl/xlsxwriter/et_xmlfile.
+- El workflow verifica import clr y los origenes de PyWebView/pythonnet/clr-loader.
+- El workflow ejecuta --smoke-gui sobre el EXE empaquetado y de nuevo sobre el EXE extraido del ZIP de Release.
+- Edge Chromium se usa para que la UI Windows renderice el mismo HTML/CSS/JS que GitHub Pages.
+- text_select=True mantiene seleccion y copia con mouse en la ventana Windows.
+
+No se modifican reglas de importacion, NUMERO=FINCA/FOLIO, Control, Gestion ni Base SENDA.

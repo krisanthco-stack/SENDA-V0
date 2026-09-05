@@ -1,0 +1,8 @@
+[project]
+name = "senda-v0"
+version = "0.4.6"
+requires-python = ">=3.10"
+description = "SENDA.V0 local registry workflow"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

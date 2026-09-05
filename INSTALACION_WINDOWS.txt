@@ -1,0 +1,28 @@
+SENDA.V0 0.4.6 - INSTALACION WINDOWS
+
+PAQUETE OFICIAL
+El paquete Windows se genera en GitHub Actions con PyInstaller. Ya contiene Python y las dependencias necesarias para SENDA; el usuario final no necesita instalar Python por separado.
+
+INSTALAR
+1. Extraiga TODO SENDA.V0_0.4.6_WINDOWS_DESKTOP.zip en una carpeta normal.
+2. Cierre SENDA.V0 si existe una versión anterior abierta.
+3. Ejecute INSTALAR_SENDA_V0.bat.
+4. El instalador copia solamente los archivos del programa a:
+   %LOCALAPPDATA%\Programs\SENDA.V0
+5. Conserva los datos en:
+   %LOCALAPPDATA%\SENDA.V0
+6. Ejecuta SENDA.V0.exe --check antes de crear/abrir el acceso directo.
+
+INTERFAZ
+La aplicación instalada usa la misma carpeta ui/ que la visualización HTML de GitHub. Se abre en una ventana propia WebView; no abre un navegador externo.
+
+ACTUALIZAR
+Ejecute ACTUALIZAR_SENDA_V0.bat desde el paquete NUEVO. La actualización reemplaza archivos del programa y conserva %LOCALAPPDATA%\SENDA.V0.
+
+DESINSTALAR
+La desinstalación conserva los datos por defecto. El borrado de datos exige una confirmación explícita.
+
+GENERAR DESDE GITHUB
+Actions -> Build SENDA.V0 Windows Desktop -> Run workflow.
+Artifact: SENDA.V0-0.4.6-Windows-Desktop
+Release:  SENDA.V0_0.4.6_WINDOWS_DESKTOP.zip

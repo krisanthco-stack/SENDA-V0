@@ -1,0 +1,18 @@
+SENDA.V0 0.4.5 - AUDITORIA FINAL
+
+CAMBIO SOLICITADO
+- Eliminada importación de ENLACE/LINK/URL/HIPERVINCULO/VINCULO/DIRECCION_WEB.
+- Eliminadas columnas/botones de enlace en Información SENDA, Control y Gestión.
+- Eliminada URL de respaldo de expedientes.
+- Enlaces no se copian ni exportan ni se escriben en nuevas bases fusionables.
+- Bases SQLite antiguas siguen siendo legibles; el campo legacy no se expone ni reutiliza.
+
+VERIFICACION
+- pytest: 122 passed.
+- SENDA_V0_DESKTOP.pyw --check: OK 0.4.5.
+- ui/app.js: sintaxis OK.
+- workflow GitHub Actions: YAML OK.
+- UI única: ui/ se empaqueta en PyInstaller y GitHub Pages usa la misma ui/.
+- Importación real junio: 8691 nuevos, 1657 duplicados evitados, 0 omitidos, 0 errores para el lote XLS probado.
+- NUMERO=FINCA/FOLIO conservado.
+- Casos 281400, 281407, 281408, 281413 y 281414 reconocidos como 4-281400, 4-281407, 4-281408, 4-281413 y 4-281414.
