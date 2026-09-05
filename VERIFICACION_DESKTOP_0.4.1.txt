@@ -1,0 +1,56 @@
+SENDA.V0 0.4.1 DESKTOP - VERIFICACION
+Fecha: 2026-09-02
+
+OBJETIVOS DE ESTA ACTUALIZACION
+- Inicio con estadisticas visuales: categoria, distrito, evolucion mensual, KPI, alarmas y movimientos recientes.
+- Alarmas visibles en rojo / amarillo / verde.
+- Tipografia y jerarquia visual aumentadas.
+- Carga Desktop compatible con XLS, XLSX, CSV, JSON, TXT, ZIP y RAR.
+- Regla anti-duplicados por hash del corte + firma exacta de fila fuente.
+- Instalacion desde GitHub Releases.
+- Datos persistentes fuera del programa en %LOCALAPPDATA%\SENDA.V0.
+
+VERIFICACION AUTOMATIZADA
+- python -m pytest -q
+  Resultado: 69 passed.
+- python -m app.desktop --check --data-dir <temporal>
+  Resultado: SENDA.V0 Desktop OK.
+- python -m compileall -q app
+  Resultado: sin errores.
+
+MUESTRAS REALES DEL USUARIO
+Corte principal (catalogos + XLS suministrados):
+- Nuevos insertados: 6,249
+- Omitidos por reglas de catalogo: 1,511
+- Catalogos procesados: 646
+- Errores: 0
+
+RAR real SARAPIQUI.rar, cargado despues del corte:
+- Nuevos insertados: 20
+- Errores: 0
+- Total acumulado: 6,269 movimientos
+
+Repeticion exacta del corte principal:
+- Nuevos insertados: 0
+- duplicate_import: true
+- Total antes/despues: 6,269 / 6,269
+- Resultado: no duplico movimientos.
+
+Excel:
+- XLS binario BIFF real de prueba: 1/1 importado correctamente.
+- XLSX real generado con openpyxl: 1/1 importado correctamente.
+- Los archivos .xls de muestra del usuario se reconocen por contenido; varios son texto delimitado con extension .xls y se importan como tal, sin depender solo de la extension.
+
+EMPAQUETADO WINDOWS
+El workflow .github/workflows/build-windows-desktop.yml:
+- usa windows-latest;
+- instala xlrd/openpyxl/xlsxwriter;
+- incluye 7-Zip (7z.exe + 7z.dll) para RAR;
+- ejecuta pruebas antes del build;
+- crea SENDA.V0.exe con PyInstaller;
+- ejecuta SENDA.V0.exe --check;
+- crea SENDA.V0_0.4.1_WINDOWS_DESKTOP.zip;
+- publica/actualiza la Release v0.4.1 en GitHub.
+
+NOTA
+Este entorno Linux no genera el EXE Windows final. El EXE debe compilarse en GitHub Actions windows-latest, igual que la version 0.4.0 que ya produjo un build exitoso.
