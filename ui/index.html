@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SENDA.V0 · Registro Inmobiliario</title><link rel="icon" href="assets/senda_v0.ico"><link rel="stylesheet" href="app.css"></head>
+<body>
+<header class="topbar">
+  <div class="brand"><div class="mark"><img src="assets/senda_v0.png" alt="SENDA.V0"></div><div><b>SENDA.V0</b><span>Gestión registral local · Sarapiquí</span></div></div>
+  <nav class="topnav" aria-label="Módulos principales">
+    <button class="nav active" data-module="inicio">INICIO</button>
+    <button class="nav" data-module="informacion">INFORMACIÓN SENDA</button>
+    <button class="nav" data-module="control">CONTROL</button>
+    <button class="nav" data-module="gestion">GESTIÓN</button>
+  </nav>
+  <div class="server"><span id="serverDot" class="dot"></span><div><b id="serverState">Conectando…</b><small id="serverDetail">Servidor local</small></div></div>
+</header>
+
+<div class="filterbar">
+  <label>Año<select id="filterYear"><option>2026</option><option>2025</option><option>2024</option></select></label>
+  <label>Año trámite<input id="filterTramiteYear" type="number" min="2000" max="2100" placeholder="Todos"></label>
+  <label>Trimestre<select id="filterQuarter"><option value="TODOS">Todos</option><option>T1</option><option>T2</option><option>T3</option><option>T4</option></select></label>
+  <label>Mes<select id="filterMonth"><option value="TODOS">Todos</option><option value="1">Enero</option><option value="2">Febrero</option><option value="3">Marzo</option><option value="4">Abril</option><option value="5">Mayo</option><option value="6">Junio</option><option value="7">Julio</option><option value="8">Agosto</option><option value="9">Septiembre</option><option value="10">Octubre</option><option value="11">Noviembre</option><option value="12">Diciembre</option></select></label>
+  <label>Distrito<select id="filterDistrict"><option value="TODOS">Todos</option><option>PUERTO VIEJO</option><option>LA VIRGEN</option><option>HORQUETAS</option><option>LLANURAS DEL GASPAR</option><option>CUREÑA</option></select></label>
+  <label>Alarma<select id="filterAlarm"><option value="TODAS">Todas</option><option value="red">🔴 Roja · 90 días o más</option><option value="yellow">🟡 Amarilla · más de 60 días</option><option value="green">🟢 Verde · hasta 60 días</option></select></label>
+  <button id="applyFilters" class="btn primary">APLICAR</button>
+  <div class="period-note">T1 Ene–Mar · T2 Abr–Jun · T3 Jul–Sep · T4 Oct–Dic</div>
+</div>
+
+<div class="shell">
+<main class="workspace">
+<section id="view-inicio" class="view active" data-view="inicio">
+  <div class="upload-strip panel">
+    <div><h2>CARGA DEL CORTE</h2><p>Excel .xls/.xlsx · .csv · .json · .txt · .zip · .rar · procesamiento por lotes.</p></div>
+    <label>Año<input id="importYear" type="number" value="2026" min="2000" max="2100"></label>
+    <label>Trimestre<select id="importQuarter"><option>T1</option><option selected>T2</option><option>T3</option><option>T4</option></select></label>
+    <label>Distrito<select id="importDistrict"><option>HORQUETAS</option><option>PUERTO VIEJO</option><option>LA VIRGEN</option><option>LLANURAS DEL GASPAR</option><option>CUREÑA</option></select></label>
+    <label class="filepick">ARCHIVOS<input id="importFiles" type="file" multiple accept=".xls,.xlsx,.csv,.json,.txt,.zip,.rar"></label>
+    <button id="importButton" class="btn success">IMPORTAR</button>
+    <div class="progress"><i id="uploadProgress"></i></div><small id="importStatus">Sin carga activa</small><div class="sync-actions"><b>BASE SENDA FUSIONABLE</b><button id="syncExportJson" class="btn">DESCARGAR JSON</button><button id="syncExportXlsx" class="btn">DESCARGAR EXCEL</button><span>Para fusionar otra base, selecciónela en ARCHIVOS y use IMPORTAR.</span></div>
+  </div>
+
+  <div class="kpis six">
+    <article><span>Movimientos</span><b id="kMov">0</b></article>
+    <article><span>Folios / Fincas</span><b id="kFolios">0</b></article>
+    <article><span>Mov. Control / Gestión</span><b id="kWorkflowMov">0</b></article>
+    <article><span>En Control</span><b id="kControl">0</b></article>
+    <article><span>En Gestión</span><b id="kGestion">0</b></article>
+    <article><span>🔴 Alarmas rojas</span><b id="kRed">0</b></article>
+  </div>
+
+  <div class="dashboard-grid">
+    <article class="panel"><div class="panel-head"><h2>MOVIMIENTOS POR CATEGORÍA</h2><small id="dashboardScope">Todos</small></div><div id="categoryBars" class="bars"></div></article>
+    <article class="panel"><div class="panel-head"><h2>MOVIMIENTOS POR DISTRITO</h2><small>Filtro activo</small></div><div id="districtBars" class="bars"></div></article>
+    <article class="panel wide"><div class="panel-head"><h2>MOVIMIENTOS RECIENTES</h2><div class="actions compact"><button class="btn" data-export="json">JSON</button><button class="btn" data-export="csv">CSV</button><button class="btn" data-export="xlsx">EXCEL</button><button id="refreshDashboard" class="btn primary">ACTUALIZAR</button></div></div><div class="tablewrap"><table><thead><tr><th>Folio</th><th>Plano</th><th>Fecha</th><th>Movimiento</th><th>Código</th><th>Operación</th><th>Estado</th><th>Alarma</th></tr></thead><tbody id="recentRows"></tbody></table></div></article>
+  </div>
+</section>
+
+<section id="view-informacion" class="view" data-view="informacion">
+  <div class="panel section-title"><div><h2>INFORMACIÓN SENDA · FOLIOS / FINCAS</h2><p>Bandeja general. Seleccione uno o varios expedientes y envíe únicamente esos a Control.</p></div><div class="badge-line"><span class="badge">Pendientes <b id="infoTotalBadge">0</b></span><span class="badge amber">En Control <b id="infoControlBadge">0</b></span></div></div>
+  <div class="quickbar" id="infoQuickbar">
+    <button class="quick active" data-info-type="TODOS">TODOS</button><button class="quick" data-info-type="FINCAS">FINCAS</button><button class="quick" data-info-type="HIPOTECAS">HIPOTECAS</button><button class="quick" data-info-type="GRAVÁMENES">GRAVÁMENES</button><button class="quick" data-info-type="SEGREGACIONES">SEGREGACIONES</button><button class="quick" data-info-type="ANOTACIONES">ANOTACIONES</button><button class="quick" data-info-type="HISTÓRICOS">HISTÓRICOS</button><button class="quick" data-info-type="CERRADAS">CERRADAS</button><button class="quick" data-info-type="OTROS">OTROS</button>
+  </div>
+  <div class="panel manual-case">
+    <div><h2>AGREGAR EXPEDIENTE MANUAL</h2><p>Puede existir antes de que lleguen movimientos; luego se vincula por folio o plano.</p></div>
+    <input id="manualFolio" placeholder="Folio / Finca">
+    <input id="manualPlano" placeholder="Plano">
+    <select id="manualDistrict"><option>HORQUETAS</option><option>PUERTO VIEJO</option><option>LA VIRGEN</option><option>LLANURAS DEL GASPAR</option><option>CUREÑA</option></select>
+    <input id="manualNote" placeholder="Observación / trámite">
+    <button id="manualCaseCreate" class="btn success">+ AGREGAR</button>
+  </div>
+  <div class="panel info-toolbar">
+    <label class="checkline"><input id="infoSelectPage" type="checkbox"> Seleccionar página</label>
+    <span id="infoSelectedCount" class="selected-count">0 seleccionados</span>
+    <button id="infoToControl" class="btn primary" disabled>PASAR A CONTROL</button>
+    <input id="infoCedula" class="filter-ident" placeholder="Cédula / identificación">
+    <input id="infoJuridica" class="filter-ident" placeholder="Cédula jurídica">
+    <input id="infoSearch" placeholder="Folio, plano, trámite, titular u operación">
+    <button id="infoSearchBtn" class="btn">BUSCAR</button>
+    <label>Mostrar<select id="infoPageSize"><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option></select></label>
+  </div>
+  <div class="tablewrap info-table"><table><thead><tr><th></th><th>Folio / Finca</th><th>Plano</th><th>Distrito</th><th>Derechos</th><th>Movimientos</th><th>Primer mov.</th><th>Último mov.</th><th>Estado</th><th>Alarma</th><th></th></tr></thead><tbody id="infoRows"></tbody></table></div>
+  <div class="pager"><button id="infoPrev" class="btn">‹ ANTERIOR</button><span id="infoPager">Página 1</span><button id="infoNext" class="btn">SIGUIENTE ›</button></div>
+  <div id="infoDetail" class="panel detail-panel hidden"></div>
+</section>
+
+<section id="view-control" class="view" data-view="control">
+  <div class="panel control-head"><div><h2>CONTROL</h2><p>Solo aparecen los trámites seleccionados desde Información SENDA. Puede revisar varios simultáneamente.</p></div><input id="controlSearch" placeholder="Folio, plano, distrito o responsable"><button id="controlRefresh" class="btn primary">BUSCAR</button></div>
+  <div class="control-layout">
+    <div class="panel control-list-panel"><div class="panel-head"><h2>TRÁMITES ACTIVOS</h2><b id="controlCount">0</b></div><div id="controlList" class="control-list"></div></div>
+    <div class="panel control-detail">
+      <div class="panel-head"><div><h2 id="controlTitle">SELECCIONE UN TRÁMITE</h2><small id="controlSubtitle">Seleccione uno o varios movimientos. Finalizar envía únicamente esos a Gestión.</small></div><div class="actions"><button id="copyControlCase" class="btn" disabled>COPIAR EXPEDIENTE</button><button id="controlFinalize" class="btn danger" disabled>FINALIZAR</button></div></div>
+      <div id="controlEmpty" class="empty">Seleccione un expediente de la lista de Control.</div>
+      <div id="controlBody" class="hidden">
+        <div class="edit-grid">
+          <label>Folio / Finca<input id="editFolio"></label><label>Plano<input id="editPlano"></label><label>Distrito<select id="editDistrict"><option>HORQUETAS</option><option>PUERTO VIEJO</option><option>LA VIRGEN</option><option>LLANURAS DEL GASPAR</option><option>CUREÑA</option><option>SIN IDENTIFICAR</option></select></label>
+          <label>Responsable<input id="editResponsible"></label><label>Prioridad<select id="editPriority"><option>NORMAL</option><option>ALTA</option><option>URGENTE</option></select></label><label class="note-field">Observaciones<input id="editNote"></label><button id="controlSave" class="btn success">GUARDAR CAMBIOS</button>
+        </div>
+        <div id="rightsBox" class="rights-box"></div>
+        <div class="quickbar smallquick" id="controlQuickbar"><button class="quick active" data-control-type="TODOS">TODOS</button><button class="quick" data-control-type="FINCAS">FINCAS</button><button class="quick" data-control-type="HIPOTECAS">HIPOTECAS</button><button class="quick" data-control-type="GRAVÁMENES">GRAVÁMENES</button><button class="quick" data-control-type="SEGREGACIONES">SEGREGACIONES</button><button class="quick" data-control-type="ANOTACIONES">ANOTACIONES</button><button class="quick" data-control-type="HISTÓRICOS">HISTÓRICOS</button><button class="quick" data-control-type="CERRADAS">CERRADAS</button><button class="quick" data-control-type="OTROS">OTROS</button></div>
+        <div class="movement-selection"><label class="checkline"><input id="controlSelectPage" type="checkbox"> Seleccionar página</label><button id="controlClearSelection" class="btn mini">LIMPIAR SELECCIÓN</button><b id="controlSelectedCount">0 seleccionados</b></div><div class="movement-meta"><b id="controlMovementCount">0 movimientos</b><label>Mostrar<select id="controlPageSize"><option value="25" selected>25</option><option value="50">50</option><option value="100">100</option></select></label></div>
+        <div class="tablewrap"><table><thead><tr><th></th><th>Fecha</th><th>Derecho</th><th>Plano</th><th>Movimiento</th><th>Código</th><th>Operación</th><th>Titular</th></tr></thead><tbody id="controlMovementRows"></tbody></table></div>
+        <div class="pager"><button id="controlPrev" class="btn">‹ ANTERIOR</button><span id="controlPager">Página 1</span><button id="controlNext" class="btn">SIGUIENTE ›</button></div>
+        <details class="audit-box"><summary>HISTORIAL DE CAMBIOS</summary><div id="controlAudit"></div></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="view-gestion" class="view" data-view="gestion">
+  <div class="panel control-head"><div><h2>GESTIÓN</h2><p>Trámites que fueron FINALIZADOS dentro de Control.</p></div><input id="managementSearch" placeholder="Folio, plano, distrito o responsable"><button id="managementRefresh" class="btn primary">BUSCAR</button></div>
+  <div class="dashboard-grid management-stats-grid">
+    <article class="panel"><div class="panel-head"><h2>TRÁMITES REALIZADOS POR MES</h2><small id="managementStatsTotal">0 realizados</small></div><div id="managementMonthBars" class="bars"></div></article>
+    <article class="panel"><div class="panel-head"><h2>TRÁMITES REALIZADOS POR DISTRITO</h2><small>Según filtros superiores</small></div><div id="managementDistrictBars" class="bars"></div></article>
+  </div>
+  <div class="tablewrap management-table"><table><thead><tr><th>Folio / Finca</th><th>Plano</th><th>Distrito</th><th>Responsable</th><th>Seleccionados</th><th>Estado Gestión</th><th>Finalizado</th><th>Observación</th><th></th></tr></thead><tbody id="managementRows"></tbody></table></div>
+  <div id="managementDetail" class="panel detail-panel hidden"></div>
+</section>
+</main>
+
+<aside class="context-panel">
+  <details open><summary>INFORMACIÓN SENDA</summary><div class="mini-grid"><span>Año</span><b id="ctxYear">2026</b><span>Trimestre</span><b id="ctxQuarter">Todos</b><span>Mes</span><b id="ctxMonth">Todos</b><span>Distrito</span><b id="ctxDistrict">Todos</b></div><div id="quarterHistory" class="quarter-history"></div></details>
+  <details open><summary>FOLIOS / FINCAS PENDIENTES</summary><div class="big-number" id="ctxPending">0</div><small>Visibles en Información SENDA</small><div class="mini-grid flow-mini"><span>En Control</span><b id="ctxControl">0</b><span>En Gestión</span><b id="ctxGestion">0</b></div></details>
+  <details open><summary>🚨 ALARMAS</summary><div class="alarm-line red"><span>🔴 90 días o más</span><b id="ctxRed">0</b></div><div class="alarm-line yellow"><span>🟡 Más de 60 días</span><b id="ctxYellow">0</b></div><div class="alarm-line green"><span>🟢 Hasta 60 días</span><b id="ctxGreen">0</b></div></details>
+  <details><summary>LEYENDA DE ESTADO</summary><div class="legend"><span><i class="blue"></i>Información</span><span><i class="amber"></i>En Control</span><span><i class="green"></i>Gestión</span><span><i class="gray"></i>Sin movimiento</span></div></details>
+  <details><summary>🏷 CÓDIGOS</summary><div id="catalogSummary" class="small-list">Los catálogos CATALOGO_COD_* se cargan como metadatos, no como movimientos.</div></details>
+  <details><summary>DATOS / MANTENIMIENTO</summary><div id="dataPath" class="path">—</div><p class="small-text">Actualizar conserva la base y los datos cargados. Desinstalar conserva datos por defecto.</p><button id="updateFromGitHub" class="btn primary maintenance-update">↻ ACTUALIZAR DESDE GITHUB</button></details>
+</aside>
+</div>
+<div id="toast" class="toast"></div>
+<script src="app.js"></script>
+</body></html>
